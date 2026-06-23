@@ -1,0 +1,19 @@
+# Exclude compiled output — Docker builds from source
+target/
+
+# Exclude IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Exclude git
+.git/
+.gitignore
+
+# Exclude docs
+*.md
+*.txt
+
+# Exclude other compose files
+docker-compose.yml

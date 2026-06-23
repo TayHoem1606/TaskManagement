@@ -1,0 +1,1986 @@
+{
+  "info": {
+    "_postman_id": "1252a97c-dd52-43b0-b014-9d12681580eb",
+    "name": "Task Management System — Full API Collection",
+    "description": "Complete API test collection for the Task Management System.\n\nHOW JWT WORKS IN THIS COLLECTION:\nEvery endpoint requires a valid Keycloak JWT. Run a Login request first — the test script stores the token in {{access_token}}. The collection-level auth (Bearer {{access_token}}) automatically sends it on every subsequent request.\n\nSETUP:\n1. docker compose up -d --build\n2. Wait ~60s for Keycloak to start\n3. Import this collection into Postman\n4. Run any Login request first\n5. Run any CRUD request — token is sent automatically\n\nCOLLECTION VARIABLES:\nbase_url        = http://localhost:8080\nkeycloak_url    = http://localhost:8180\nrealm           = internship-task-realm\nclient_id       = task-frontend\naccess_token    = (populated by login requests)\ntask_id         = (populated by create/get requests)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52680106",
+    "_collection_link": "https://go.postman.co/collection/52680106-1252a97c-dd52-43b0-b014-9d12681580eb?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth — Keycloak Tokens",
+      "item": [
+        {
+          "name": "Login as ADMIN (admin1 / admin123)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set('access_token', json.access_token);",
+                  "    pm.collectionVariables.set('refresh_token', json.refresh_token || '');",
+                  "    pm.collectionVariables.set('current_username', 'admin1');",
+                  "    console.log('Logged in as admin1 (ADMIN). Token expires in', json.expires_in, 's');",
+                  "}",
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('access_token present', () => pm.expect(json.access_token).to.be.a('string').and.not.empty);",
+                  "pm.test('token_type is Bearer', () => pm.expect(json.token_type).to.equal('Bearer'));",
+                  "pm.test('expires_in is 300', () => pm.expect(json.expires_in).to.equal(300));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "description": "ROPC grant — direct username+password login"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}",
+                  "description": "task-frontend is publicClient=true (no client_secret needed)"
+                },
+                {
+                  "key": "username",
+                  "value": "admin1"
+                },
+                {
+                  "key": "password",
+                  "value": "admin123"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile",
+                  "description": "openid scope required for preferred_username claim in JWT"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "{{realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "description": "Gets a JWT for admin1 (ADMIN role). The test script stores it in {{access_token}}.\n\nDecoded JWT contains:\n  preferred_username: 'admin1'\n  realm_access.roles: ['ADMIN']\n\nSpring Boot's KeycloakJwtAuthConverter reads realm_access.roles and creates ROLE_ADMIN authority."
+          },
+          "response": []
+        },
+        {
+          "name": "Login as USER1 (user1 / user123)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set('access_token', json.access_token);",
+                  "    pm.collectionVariables.set('refresh_token', json.refresh_token || '');",
+                  "    pm.collectionVariables.set('current_username', 'user1');",
+                  "    console.log('Logged in as user1 (USER). Can only modify own tasks.');",
+                  "}",
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('access_token present', () => pm.expect(json.access_token).to.be.a('string').and.not.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}"
+                },
+                {
+                  "key": "username",
+                  "value": "user1"
+                },
+                {
+                  "key": "password",
+                  "value": "user123"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "{{realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login as USER2 (user2 / user123)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set('access_token', json.access_token);",
+                  "    pm.collectionVariables.set('refresh_token', json.refresh_token || '');",
+                  "    pm.collectionVariables.set('current_username', 'user2');",
+                  "    console.log('Logged in as user2 (USER). Used for ownership restriction tests.');",
+                  "}",
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('access_token present', () => pm.expect(json.access_token).to.be.a('string').and.not.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}"
+                },
+                {
+                  "key": "username",
+                  "value": "user2"
+                },
+                {
+                  "key": "password",
+                  "value": "user123"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "{{realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set('access_token', json.access_token);",
+                  "    if (json.refresh_token) pm.collectionVariables.set('refresh_token', json.refresh_token);",
+                  "    console.log('Token refreshed. New token expires in', json.expires_in, 's');",
+                  "}",
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('New access_token issued', () => pm.expect(json.access_token).to.be.a('string').and.not.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "refresh_token"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}"
+                },
+                {
+                  "key": "refresh_token",
+                  "value": "{{refresh_token}}",
+                  "description": "Populated by the Login requests"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "{{realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "description": "Gets a new access_token using the refresh_token. Use this if the access token expired (after 5 minutes)."
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — Login with wrong password → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('No access_token in response', () => pm.expect(pm.response.json().access_token).to.be.undefined);",
+                  "console.log('PASS: Keycloak correctly rejected bad credentials');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}"
+                },
+                {
+                  "key": "username",
+                  "value": "admin1"
+                },
+                {
+                  "key": "password",
+                  "value": "WRONG_PASSWORD"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "{{realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Login requests for each demo user. Run one first to populate {{access_token}}.\n\nUses Keycloak Resource Owner Password Credentials (ROPC) grant — Postman-friendly direct login without browser redirects."
+    },
+    {
+      "name": "Tasks — GET (Read)",
+      "item": [
+        {
+          "name": "GET all tasks (no filters)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('Each task has required fields', () => {",
+                  "    const tasks = pm.response.json();",
+                  "    if (tasks.length > 0) {",
+                  "        const t = tasks[0];",
+                  "        pm.expect(t).to.have.property('id');",
+                  "        pm.expect(t).to.have.property('title');",
+                  "        pm.expect(t).to.have.property('status');",
+                  "        pm.expect(t).to.have.property('priority');",
+                  "        pm.expect(t).to.have.property('createdBy');",
+                  "        pm.expect(t).to.have.property('dueDate');",
+                  "    }",
+                  "});",
+                  "const tasks = pm.response.json();",
+                  "if (tasks.length > 0 && !pm.collectionVariables.get('task_id')) {",
+                  "    pm.collectionVariables.set('task_id', tasks[0].id);",
+                  "    console.log('Saved task_id:', tasks[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
+            },
+            "description": "Returns all tasks. Authorization: Bearer {{access_token}} is sent automatically by the collection-level auth."
+          },
+          "response": []
+        },
+        {
+          "name": "GET task by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Correct ID returned', () => pm.expect(pm.response.json().id).to.equal(pm.collectionVariables.get('task_id')));",
+                  "pm.test('Has createdBy', () => pm.expect(pm.response.json().createdBy).to.be.a('string'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — GET non-existent ID → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('ErrorResponse structure', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('status', 404);",
+                  "    pm.expect(b).to.have.property('error', 'Not Found');",
+                  "    pm.expect(b).to.have.property('message');",
+                  "    pm.expect(b).to.have.property('timestamp');",
+                  "    pm.expect(b).to.have.property('path');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/TASK-DOES-NOT-EXIST",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "TASK-DOES-NOT-EXIST"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — GET all tasks, no token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
+            },
+            "description": "Overrides collection-level auth with 'No Auth'. Spring Security returns 401 before the controller runs."
+          },
+          "response": []
+        }
+      ],
+      "description": "Read operations query MongoDB directly — no Kafka involved. Both ADMIN and USER roles can read all tasks."
+    },
+    {
+      "name": "Tasks — POST (Create)",
+      "item": [
+        {
+          "name": "POST create task — HIGH priority",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 202 Accepted', () => pm.response.to.have.status(202));",
+                  "pm.test('Response contains Task ID', () => {",
+                  "    const body = pm.response.text();",
+                  "    pm.expect(body).to.include('Task creation event published');",
+                  "    pm.expect(body).to.include('TASK-');",
+                  "});",
+                  "const match = pm.response.text().match(/TASK-[A-Z0-9]+/);",
+                  "if (match) {",
+                  "    pm.collectionVariables.set('task_id', match[0]);",
+                  "    console.log('Created. Task ID saved:', match[0]);",
+                  "    console.log('Wait 1-2s then run GET to confirm task is in MongoDB');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Prepare internship report\",\n  \"description\": \"Complete the weekly internship summary and submit by Friday\",\n  \"status\": \"PENDING\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2027-06-30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
+            },
+            "description": "createdBy is NOT in the request body. Spring Boot extracts it from JWT preferred_username automatically and sets it on the saved Task."
+          },
+          "response": []
+        },
+        {
+          "name": "POST create task — MEDIUM priority",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 202 Accepted', () => pm.response.to.have.status(202));",
+                  "const match = pm.response.text().match(/TASK-[A-Z0-9]+/);",
+                  "if (match) pm.collectionVariables.set('task_id', match[0]);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Review pull request\",\n  \"description\": \"Review the feature branch changes before merging to main\",\n  \"status\": \"PENDING\",\n  \"priority\": \"MEDIUM\",\n  \"dueDate\": \"2027-08-15\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — POST blank title → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Validation error message', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.equal(400);",
+                  "    pm.expect(b.error).to.equal('Bad Request');",
+                  "    pm.expect(b.message.toLowerCase()).to.include('empty');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"\",\n  \"description\": \"Valid description\",\n  \"status\": \"PENDING\",\n  \"priority\": \"MEDIUM\",\n  \"dueDate\": \"2027-06-30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
+            },
+            "description": "Triggers @NotBlank on title in TaskRequestDTO. GlobalExceptionHandler catches WebExchangeBindException → 400."
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — POST past due date → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Past date validation message', () => {",
+                  "    pm.expect(pm.response.json().message.toLowerCase()).to.include('past');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Past Due Task\",\n  \"description\": \"This should fail validation\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2020-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
+            },
+            "description": "Triggers @FutureOrPresent on dueDate in TaskRequestDTO."
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — POST no token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Should Be Blocked\",\n  \"description\": \"No token\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2027-06-30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Returns 202 Accepted (NOT 201) — task is saved async via Kafka. Wait 1-2 seconds after 202 before running GET to verify the task exists in MongoDB."
+    },
+    {
+      "name": "Tasks — PUT (Full Update)",
+      "item": [
+        {
+          "name": "PUT update task (owner or ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 202 Accepted', () => pm.response.to.have.status(202));",
+                  "pm.test('Update event confirmed', () => pm.expect(pm.response.text()).to.include('Update event published'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Prepare internship report (UPDATED)\",\n  \"description\": \"Updated: include code review feedback and mentor comments\",\n  \"status\": \"PENDING\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2027-07-30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — PUT wrong user (user2 on user1 task) → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('Forbidden error body', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.equal(403);",
+                  "    pm.expect(b.error).to.equal('Forbidden');",
+                  "    pm.expect(b.message).to.include('permission');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Hacked by user2\",\n  \"description\": \"This should be blocked\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2027-12-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            },
+            "description": "SETUP: 1) Login as USER1  2) Create task  3) Login as USER2  4) Run this.\n\nvalidateOwnership(): getCurrentUsername()='user2', task.createdBy='user1', isAdmin=false → AccessDeniedException → 403."
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — PUT no token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Should Fail\",\n  \"description\": \"No token\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2027-06-30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Full update — replaces all fields. Only works when task is PENDING. Ownership check runs BEFORE Kafka: validateOwnership() is called synchronously while the JWT SecurityContext is active. 403 is returned immediately if ownership fails — no Kafka event is published."
+    },
+    {
+      "name": "Tasks — PATCH (Status Update)",
+      "item": [
+        {
+          "name": "PATCH status → IN_PROGRESS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 202 Accepted', () => pm.response.to.have.status(202));",
+                  "pm.test('Response mentions IN_PROGRESS', () => pm.expect(pm.response.text()).to.include('IN_PROGRESS'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}",
+                "status"
+              ]
+            },
+            "description": "TaskController publishes TaskUpdatedEvent with null title. TaskServiceImpl sees null title → MODE A (status-only update)."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH status → COMPLETED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 202 Accepted', () => pm.response.to.have.status(202));",
+                  "pm.test('Response mentions COMPLETED', () => pm.expect(pm.response.text()).to.include('COMPLETED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}",
+                "status"
+              ]
+            },
+            "description": "Run AFTER PATCH → IN_PROGRESS."
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — PATCH wrong user → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 Forbidden', () => pm.response.to.have.status(403));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}",
+                "status"
+              ]
+            },
+            "description": "SETUP: Login as USER2 while {{task_id}} belongs to USER1."
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — PATCH PENDING→COMPLETED directly → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict (if task is still PENDING)', () => {",
+                  "    pm.expect([202, 409]).to.include(pm.response.code);",
+                  "    if (pm.response.code === 409) {",
+                  "        pm.expect(pm.response.json().message).to.include('IN_PROGRESS');",
+                  "        console.log('PASS: PENDING→COMPLETED jump correctly blocked');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}",
+                "status"
+              ]
+            },
+            "description": "SETUP: Make sure {{task_id}} is a PENDING task. validateStatusTransition() blocks PENDING→COMPLETED. Must pass through IN_PROGRESS."
+          },
+          "response": []
+        }
+      ],
+      "description": "Status-only update. Transition rules enforced by validateStatusTransition():\n  PENDING → IN_PROGRESS  ALLOWED\n  IN_PROGRESS → COMPLETED  ALLOWED\n  PENDING → COMPLETED  BLOCKED (must go through IN_PROGRESS)\n  COMPLETED → anything  BLOCKED (final state)"
+    },
+    {
+      "name": "Tasks — DELETE",
+      "item": [
+        {
+          "name": "DELETE task (owner or ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 202 Accepted', () => pm.response.to.have.status(202));",
+                  "pm.test('Deletion event confirmed', () => pm.expect(pm.response.text()).to.include('Task deletion event published'));",
+                  "console.log('Wait 1-2s then run GET by ID to confirm it returns 404');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — DELETE wrong user (user2 on user1 task) → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('Forbidden error body', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.status).to.equal(403);",
+                  "    pm.expect(b.error).to.equal('Forbidden');",
+                  "    pm.expect(b.message).to.include('permission');",
+                  "    pm.expect(b).to.have.property('path');",
+                  "    pm.expect(b).to.have.property('timestamp');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            },
+            "description": "SETUP: 1) Login as USER1  2) Create task  3) Login as USER2  4) Run this.\n\nvalidateOwnership() → AccessDeniedException → GlobalExceptionHandler.handleForbidden() → 403 with ErrorResponse body."
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — DELETE non-existent task → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/TASK-DOES-NOT-EXIST",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "TASK-DOES-NOT-EXIST"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "FAIL — DELETE no token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Ownership checked before Kafka event is published. COMPLETED tasks can be deleted."
+    },
+    {
+      "name": "E2E — ADMIN Full Lifecycle",
+      "item": [
+        {
+          "name": "E2E 1 — Login as ADMIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j=pm.response.json(); if(j.access_token){pm.collectionVariables.set('access_token',j.access_token); console.log('E2E Step 1: logged in as admin1');} pm.test('200 OK',()=>pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}"
+                },
+                {
+                  "key": "username",
+                  "value": "admin1"
+                },
+                {
+                  "key": "password",
+                  "value": "admin123"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "{{realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "E2E 2 — Create task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted',()=>pm.response.to.have.status(202)); const m=pm.response.text().match(/TASK-[A-Z0-9]+/); if(m){pm.collectionVariables.set('task_id',m[0]); console.log('E2E Step 2: created',m[0]);}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"E2E Test Task\",\n  \"description\": \"Full lifecycle — ADMIN\",\n  \"status\": \"PENDING\",\n  \"priority\": \"MEDIUM\",\n  \"dueDate\": \"2027-12-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "E2E 3 — Verify task exists (wait 1-2s first)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK — in MongoDB',()=>pm.response.to.have.status(200)); pm.test('createdBy is admin1',()=>pm.expect(pm.response.json().createdBy).to.equal('admin1')); pm.test('status is PENDING',()=>pm.expect(pm.response.json().status).to.equal('PENDING')); console.log('E2E Step 3: confirmed in MongoDB');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "E2E 4 — Update task (PUT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted',()=>pm.response.to.have.status(202)); console.log('E2E Step 4: update event published');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"E2E Test Task (updated)\",\n  \"description\": \"Updated — still PENDING\",\n  \"status\": \"PENDING\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2027-12-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "E2E 5 — Advance to IN_PROGRESS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted',()=>pm.response.to.have.status(202)); console.log('E2E Step 5: → IN_PROGRESS');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"IN_PROGRESS\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "E2E 6 — Advance to COMPLETED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted',()=>pm.response.to.have.status(202)); console.log('E2E Step 6: → COMPLETED');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"COMPLETED\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "E2E 7 — Delete COMPLETED task (ADMIN allowed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted',()=>pm.response.to.have.status(202)); console.log('E2E Step 7: delete event published');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "E2E 8 — Verify task is gone → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 Not Found — deleted from MongoDB',()=>pm.response.to.have.status(404)); console.log('E2E COMPLETE: full lifecycle verified');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Run IN ORDER as a complete smoke test. 8 steps: login → create → verify → update → advance to IN_PROGRESS → advance to COMPLETED → delete → verify gone."
+    },
+    {
+      "name": "E2E — Ownership Restriction (USER1 vs USER2 vs ADMIN)",
+      "item": [
+        {
+          "name": "Own 1 — Login as USER1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j=pm.response.json(); if(j.access_token){pm.collectionVariables.set('access_token',j.access_token); pm.collectionVariables.set('current_username','user1');} pm.test('200 OK',()=>pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}"
+                },
+                {
+                  "key": "username",
+                  "value": "user1"
+                },
+                {
+                  "key": "password",
+                  "value": "user123"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "{{realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Own 2 — USER1 creates task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202',()=>pm.response.to.have.status(202)); const m=pm.response.text().match(/TASK-[A-Z0-9]+/); if(m) pm.collectionVariables.set('task_id',m[0]);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"USER1 ownership test task\",\n  \"description\": \"Only user1 and ADMIN can modify this\",\n  \"status\": \"PENDING\",\n  \"priority\": \"MEDIUM\",\n  \"dueDate\": \"2027-12-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Own 3 — Login as USER2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j=pm.response.json(); if(j.access_token){pm.collectionVariables.set('access_token',j.access_token); pm.collectionVariables.set('current_username','user2');} pm.test('200 OK',()=>pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}"
+                },
+                {
+                  "key": "username",
+                  "value": "user2"
+                },
+                {
+                  "key": "password",
+                  "value": "user123"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "{{realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Own 4 — USER2 tries PUT on USER1 task → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('403 Forbidden',()=>pm.response.to.have.status(403)); pm.test('Error says no permission',()=>pm.expect(pm.response.json().message).to.include('permission')); console.log('PASS: USER2 blocked from modifying USER1 task');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Hacked by user2\",\n  \"description\": \"This should be blocked by validateOwnership()\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2027-12-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Own 5 — USER2 tries DELETE on USER1 task → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('403 Forbidden',()=>pm.response.to.have.status(403)); console.log('PASS: USER2 blocked from deleting USER1 task');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Own 6 — Login as ADMIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j=pm.response.json(); if(j.access_token){pm.collectionVariables.set('access_token',j.access_token); pm.collectionVariables.set('current_username','admin1');} pm.test('200 OK',()=>pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}"
+                },
+                {
+                  "key": "username",
+                  "value": "admin1"
+                },
+                {
+                  "key": "password",
+                  "value": "admin123"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "{{realm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Own 7 — ADMIN updates USER1 task → 202 (ADMIN bypasses ownership)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted — ADMIN overrides ownership',()=>pm.response.to.have.status(202)); console.log('PASS: Ownership scenario complete. USER2=403, ADMIN=202');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"ADMIN updated USER1 task\",\n  \"description\": \"ADMIN has full access regardless of createdBy\",\n  \"status\": \"PENDING\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2027-12-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Run IN ORDER to prove the ownership enforcement works end-to-end:\n\n1. USER1 logs in and creates task\n    \n2. USER2 tries PUT → 403 blocked\n    \n3. USER2 tries DELETE → 403 blocked\n    \n4. ADMIN overrides and updates successfully → 202"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "keycloak_url",
+      "value": "http://localhost:8180"
+    },
+    {
+      "key": "realm",
+      "value": "internship-task-realm"
+    },
+    {
+      "key": "client_id",
+      "value": "task-frontend"
+    },
+    {
+      "key": "current_username",
+      "value": "admin1"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "task_id",
+      "value": ""
+    }
+  ]
+}

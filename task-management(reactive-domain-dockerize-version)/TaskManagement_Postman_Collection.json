@@ -1,0 +1,923 @@
+{
+  "info": {
+    "name": "Task Management API — Spring Boot + Kafka + MongoDB",
+    "description": "Complete API test collection for the Task Management System.\n\nArchitecture: Spring Boot 4 + Kafka + MongoDB (EDA + Reactive)\n\nFlow: POST/PUT/DELETE → Kafka topic → Consumer → MongoDB\nNote: Write operations return 202 Accepted (async). Wait 1-2 seconds before GET to confirm.\n\nBase URL: http://localhost:8080",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "taskId",
+      "value": "TASK-1001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 — CREATE",
+      "item": [
+        {
+          "name": "Create Task — Valid (PENDING + HIGH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "pm.test('Response contains Task ID', function () {",
+                  "    pm.expect(pm.response.text()).to.include('Task ID:');",
+                  "});",
+                  "// Extract and save task ID for use in later requests",
+                  "const body = pm.response.text();",
+                  "const match = body.match(/Task ID: (TASK-[A-Z0-9-]+)/);",
+                  "if (match) {",
+                  "    pm.collectionVariables.set('taskId', match[1]);",
+                  "    console.log('Saved taskId:', match[1]);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Prepare internship report\",\n  \"description\": \"Complete weekly internship summary\",\n  \"status\": \"PENDING\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2026-06-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            },
+            "description": "Creates a new task. Returns 202 Accepted immediately — task is saved to MongoDB asynchronously after Kafka delivers the event.\n\nWait 1-2 seconds before calling GET to confirm the task was saved."
+          }
+        },
+        {
+          "name": "Create Task — Custom ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "pm.test('Response contains custom Task ID', function () {",
+                  "    pm.expect(pm.response.text()).to.include('TASK-1001');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"TASK-1001\",\n  \"title\": \"Setup Docker environment\",\n  \"description\": \"Configure Rancher Desktop with Kafka and MongoDB\",\n  \"status\": \"PENDING\",\n  \"priority\": \"MEDIUM\",\n  \"dueDate\": \"2026-05-15\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            },
+            "description": "Creates a task with a custom ID (TASK-1001). Use this when you want a predictable ID for subsequent update/delete tests."
+          }
+        },
+        {
+          "name": "Create Task — MEDIUM priority",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"TASK-1002\",\n  \"title\": \"Write unit tests\",\n  \"description\": \"Cover all service layer methods with JUnit tests\",\n  \"status\": \"PENDING\",\n  \"priority\": \"MEDIUM\",\n  \"dueDate\": \"2026-07-30\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            }
+          }
+        },
+        {
+          "name": "Create Task — LOW priority",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"TASK-1003\",\n  \"title\": \"Update project README\",\n  \"description\": \"Add API documentation and setup instructions\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2026-12-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 — READ",
+      "item": [
+        {
+          "name": "Get All Tasks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an('array');",
+                  "});",
+                  "pm.test('Tasks have required fields', function () {",
+                  "    const body = pm.response.json();",
+                  "    if (body.length > 0) {",
+                  "        pm.expect(body[0]).to.have.property('id');",
+                  "        pm.expect(body[0]).to.have.property('title');",
+                  "        pm.expect(body[0]).to.have.property('status');",
+                  "        pm.expect(body[0]).to.have.property('priority');",
+                  "        pm.expect(body[0]).to.have.property('dueDate');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            },
+            "description": "Returns all tasks from MongoDB. This is a direct query — no Kafka involved. Should return instantly."
+          }
+        },
+        {
+          "name": "Get Task by ID — TASK-1001",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Task has correct ID', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.equal('TASK-1001');",
+                  "});",
+                  "pm.test('Task has all required fields', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('title');",
+                  "    pm.expect(body).to.have.property('description');",
+                  "    pm.expect(body).to.have.property('status');",
+                  "    pm.expect(body).to.have.property('priority');",
+                  "    pm.expect(body).to.have.property('dueDate');",
+                  "    pm.expect(body).to.have.property('createdAt');",
+                  "    pm.expect(body).to.have.property('updatedAt');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-1001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-1001"]
+            },
+            "description": "Fetches a single task by ID. Run after Create Task with custom ID (TASK-1001)."
+          }
+        },
+        {
+          "name": "Get Task by ID — Dynamic (uses saved taskId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has task data', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('id');",
+                  "    pm.expect(body.status).to.be.oneOf(['PENDING', 'IN_PROGRESS', 'COMPLETED']);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "{{taskId}}"]
+            },
+            "description": "Uses the taskId variable saved automatically by the 'Create Task — Valid' request test script."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 — UPDATE",
+      "item": [
+        {
+          "name": "Full Update — PENDING task (PUT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "pm.test('Response confirms update event published', function () {",
+                  "    pm.expect(pm.response.text()).to.include('Task update event published');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Setup Docker environment\",\n  \"description\": \"Updated: Configure Rancher Desktop with healthchecks\",\n  \"status\": \"PENDING\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2026-06-30\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-1001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-1001"]
+            },
+            "description": "Full update of a PENDING task. Can change title, description, priority, dueDate, and status.\n\nOnly works when task is PENDING. Will fail with 409 if task is IN_PROGRESS or COMPLETED."
+          }
+        },
+        {
+          "name": "Status Update — PENDING to IN_PROGRESS (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "pm.test('Response confirms status update', function () {",
+                  "    pm.expect(pm.response.text()).to.include('IN_PROGRESS');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-1001/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-1001", "status"]
+            },
+            "description": "Advances task status from PENDING to IN_PROGRESS.\n\nOnly status field is changed — title, description, priority, dueDate remain untouched."
+          }
+        },
+        {
+          "name": "Status Update — IN_PROGRESS to COMPLETED (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "pm.test('Response confirms COMPLETED status', function () {",
+                  "    pm.expect(pm.response.text()).to.include('COMPLETED');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-1001/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-1001", "status"]
+            },
+            "description": "Advances task from IN_PROGRESS to COMPLETED. Run after PENDING → IN_PROGRESS.\n\nCOMPLETED is a final state — no further changes allowed."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 — DELETE",
+      "item": [
+        {
+          "name": "Delete Task — TASK-1002",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "pm.test('Response confirms deletion event published', function () {",
+                  "    pm.expect(pm.response.text()).to.include('Task deletion event published');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-1002",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-1002"]
+            },
+            "description": "Deletes a task. Works for tasks in any status including COMPLETED.\n\nReturns 202 Accepted — deletion is applied asynchronously via Kafka."
+          }
+        },
+        {
+          "name": "Delete Task — TASK-1003",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-1003",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-1003"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 — VALIDATION ERRORS (expect non-202)",
+      "item": [
+        {
+          "name": "ERROR — Missing title (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Error message mentions title', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.include('Title');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"No title provided\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2026-06-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            },
+            "description": "Validation test — title is required. Expects 400 Bad Request."
+          }
+        },
+        {
+          "name": "ERROR — Missing description (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Task without description\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2026-06-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            }
+          }
+        },
+        {
+          "name": "ERROR — Title exceeds 50 chars (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"This title is way too long and exceeds the fifty character limit set\",\n  \"description\": \"Valid description here\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2026-06-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            }
+          }
+        },
+        {
+          "name": "ERROR — Invalid status value (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Valid title\",\n  \"description\": \"Valid description\",\n  \"status\": \"INVALID_STATUS\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2026-06-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            }
+          }
+        },
+        {
+          "name": "ERROR — Past due date (expect 409 from consumer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted (event published)', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "pm.test('Note: Check docker logs — consumer will reject with past date error', function () {",
+                  "    pm.expect(true).to.be.true;",
+                  "    console.log('Run: docker logs task-management-app to see consumer rejection');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Expired task\",\n  \"description\": \"This has a past due date and will be rejected by consumer\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2020-01-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            },
+            "description": "Returns 202 (event published) but consumer rejects it — task will NOT appear in GET all tasks. Check docker logs to see the consumer error."
+          }
+        },
+        {
+          "name": "ERROR — Task not found (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 Not Found', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('Error message says task not found', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.include('Task not found');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-NONEXISTENT",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-NONEXISTENT"]
+            },
+            "description": "Attempts to fetch a task that does not exist. Expects 404 Not Found."
+          }
+        },
+        {
+          "name": "ERROR — Skip PENDING to COMPLETED (expect 409 from consumer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted (event published)', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "console.log('Check docker logs — consumer will reject invalid status jump');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-1001/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-1001", "status"]
+            },
+            "description": "Tries to jump from PENDING directly to COMPLETED — not allowed. Must go PENDING → IN_PROGRESS → COMPLETED.\n\nReturns 202 (event published) but consumer rejects the invalid transition. Check docker logs."
+          }
+        },
+        {
+          "name": "ERROR — Duplicate Task ID (expect 409 from consumer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted (event published)', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "console.log('Check docker logs — consumer will reject duplicate ID');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"TASK-1001\",\n  \"title\": \"Duplicate task\",\n  \"description\": \"This ID already exists in MongoDB\",\n  \"status\": \"PENDING\",\n  \"priority\": \"LOW\",\n  \"dueDate\": \"2026-06-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            },
+            "description": "Tries to create a task with an ID that already exists. Returns 202 but consumer rejects it with 'Task ID already exists'. Check docker logs."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 — FULL WORKFLOW (run in order)",
+      "item": [
+        {
+          "name": "Step 1 — Create TASK-2001",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted', function () { pm.response.to.have.status(202); });",
+                  "console.log('Wait 2 seconds then run Step 2');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"TASK-2001\",\n  \"title\": \"Full workflow test task\",\n  \"description\": \"Testing complete PENDING to COMPLETED lifecycle\",\n  \"status\": \"PENDING\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2026-09-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            }
+          }
+        },
+        {
+          "name": "Step 2 — Verify TASK-2001 created (GET)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Status is PENDING', function () {",
+                  "    pm.expect(pm.response.json().status).to.equal('PENDING');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-2001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-2001"]
+            }
+          }
+        },
+        {
+          "name": "Step 3 — Advance to IN_PROGRESS (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted', function () { pm.response.to.have.status(202); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-2001/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-2001", "status"]
+            }
+          }
+        },
+        {
+          "name": "Step 4 — Verify IN_PROGRESS (GET)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Status is IN_PROGRESS', function () {",
+                  "    pm.expect(pm.response.json().status).to.equal('IN_PROGRESS');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-2001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-2001"]
+            }
+          }
+        },
+        {
+          "name": "Step 5 — Advance to COMPLETED (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted', function () { pm.response.to.have.status(202); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"COMPLETED\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-2001/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-2001", "status"]
+            }
+          }
+        },
+        {
+          "name": "Step 6 — Verify COMPLETED (GET)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Status is COMPLETED', function () {",
+                  "    pm.expect(pm.response.json().status).to.equal('COMPLETED');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-2001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-2001"]
+            }
+          }
+        },
+        {
+          "name": "Step 7 — Delete TASK-2001 (DELETE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted', function () { pm.response.to.have.status(202); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-2001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-2001"]
+            }
+          }
+        },
+        {
+          "name": "Step 8 — Verify deleted (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 Not Found — task deleted', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/TASK-2001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "TASK-2001"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
